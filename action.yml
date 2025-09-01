@@ -63,6 +63,51 @@ runs:
           end
       end
 
+      # set up specific versions from PR if available
+      if haskey(ENV, "GITHUB_REF") && contains(ENV["GITHUB_REF"], "pull")
+          try
+              pr_match = match(r"refs/pull/(\d+)/", ENV["GITHUB_REF"])
+              pr_number = pr_match.captures[1]
+              pr_body = strip(read(`gh pr view $pr_number --repo $(ENV["GITHUB_REPOSITORY"]) --json body --jq .body`, String))
+
+              # Extract pkg code block
+              pkg_match = match(r"```pkg\s*\n(.*?)\n```"ms, pr_body)
+              if pkg_match !== nothing
+                  versionstrings = split(strip(pkg_match.captures[1]), '\n')
+
+                  specs = PackageSpec[]
+                  for pkg_str in versionstrings
+
+                      pkg_str = strip(pkg_str)
+                      isempty(pkg_str) && continue
+
+                      rev_match = match(r"(.*)#(.*)", pkg_str)
+                      if !isnothing(rev_match)
+                          name, rev = rev_match.captures
+                          push!(specs, PackageSpec(; name, rev))
+                          continue
+                      end
+                      version_match = match(r"(.*)@(.*)", pkg_str)
+                      if !isnothing(version_match)
+                          name, version = version_match.captures
+                          push!(specs, PackageSpec(; name, version=string(version)))
+                          continue
+                      end
+                  end
+
+                  # apply versions
+                  manifest_packages = [spec.name for spec in values(Pkg.dependencies())]
+                  applicable_specs = filter(spec -> spec.name in manifest_packages, specs)
+                  if !isempty(applicable_specs)
+                      @info "Add specific version for packages" applicable_specs
+                      Pkg.add(applicable_specs)
+                  end
+              end
+          catch e
+              @info "Skipped adding specific Versions because of error" e
+          end
+      end
+
       VERSION >= v"1.1.0-rc1" ? retry(Pkg.build)(verbose=true) : retry(Pkg.build)()
     shell: julia --color=yes --project=${{ inputs.project }} {0}
     env:

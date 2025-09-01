@@ -2,6 +2,19 @@
 
 This action runs the build step in a Julia package.
 
+## Inject specific dependencies
+This fork allows you to put a code block like this in the **head post** of your PR in order 
+to use specific versions of packages in the pipeline.
+````
+```pkg
+MyPackage#branch
+OtherPackage@0.1.2
+```
+````
+The action will first check if the package actually appears in your manifest. If so, it'll add the specific version/revision
+to the environment.
+
+
 ## Usage
 
 Julia needs to be installed before this action can run. This can easily be achieved with the [setup-julia](https://github.com/marketplace/actions/setup-julia-environment) action.
