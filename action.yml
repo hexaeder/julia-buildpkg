@@ -63,6 +63,8 @@ runs:
           end
       end
 
+      # resolve before adding
+      Pkg.resolve()
       # set up specific versions from PR if available
       if haskey(ENV, "GITHUB_REF") && contains(ENV["GITHUB_REF"], "pull")
           try
