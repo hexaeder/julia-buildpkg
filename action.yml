@@ -75,7 +75,7 @@ runs:
               if pkg_match !== nothing
                   versionstrings = split(strip(pkg_match.captures[1]), '\n')
 
-                  specs = PackageSpec[]
+                  specs = Pkg.PackageSpec[]
                   for pkg_str in versionstrings
 
                       pkg_str = strip(pkg_str)
@@ -84,13 +84,13 @@ runs:
                       rev_match = match(r"(.*)#(.*)", pkg_str)
                       if !isnothing(rev_match)
                           name, rev = rev_match.captures
-                          push!(specs, PackageSpec(; name, rev))
+                          push!(specs, Pkg.PackageSpec(; name, rev))
                           continue
                       end
                       version_match = match(r"(.*)@(.*)", pkg_str)
                       if !isnothing(version_match)
                           name, version = version_match.captures
-                          push!(specs, PackageSpec(; name, version=string(version)))
+                          push!(specs, Pkg.PackageSpec(; name, version=string(version)))
                           continue
                       end
                   end
