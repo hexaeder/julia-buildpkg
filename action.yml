@@ -103,6 +103,14 @@ runs:
                   if !isempty(applicable_specs)
                       @info "Add specific version for packages" applicable_specs
                       Pkg.add(applicable_specs)
+
+                      # fix compat of all manually specified packages
+                      fixed_pkg_names = [spec.name for spec in applicable_specs]
+                      # get "info" for all fixed (i.e. contains current version)
+                      fixed_pkg_info = [info for info in values(Pkg.dependencies()) if info.name ∈ fixed_pkg_names]
+                      for info in fixed_pkg_info
+                          Pkg.compat(info.name, string("~", info.version))
+                      end
                   end
               end
           catch e
