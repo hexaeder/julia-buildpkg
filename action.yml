@@ -63,9 +63,8 @@ runs:
           end
       end
 
-      # resolve before adding
-      Pkg.resolve()
-      # set up specific versions from PR if available
+      # set up specific versions from PR if available (before resolve)
+      pr_specs = Pkg.PackageSpec[]
       if haskey(ENV, "GITHUB_REF") && contains(ENV["GITHUB_REF"], "pull")
           try
               pr_match = match(r"refs/pull/(\d+)/", ENV["GITHUB_REF"])
@@ -77,44 +76,47 @@ runs:
               if pkg_match !== nothing
                   versionstrings = split(strip(pkg_match.captures[1]), '\n')
 
-                  specs = Pkg.PackageSpec[]
                   for pkg_str in versionstrings
-
                       pkg_str = strip(pkg_str)
                       isempty(pkg_str) && continue
 
                       rev_match = match(r"(.*)#(.*)", pkg_str)
                       if !isnothing(rev_match)
                           name, rev = rev_match.captures
-                          push!(specs, Pkg.PackageSpec(; name, rev))
+                          push!(pr_specs, Pkg.PackageSpec(; name=strip(name), rev=strip(rev)))
                           continue
                       end
                       version_match = match(r"(.*)@(.*)", pkg_str)
                       if !isnothing(version_match)
                           name, version = version_match.captures
-                          push!(specs, Pkg.PackageSpec(; name, version=string(version)))
+                          push!(pr_specs, Pkg.PackageSpec(; name=strip(name), version=string(strip(version))))
                           continue
                       end
                   end
 
-                  # apply versions
-                  manifest_packages = [spec.name for spec in values(Pkg.dependencies())]
-                  applicable_specs = filter(spec -> spec.name in manifest_packages, specs)
-                  if !isempty(applicable_specs)
-                      @info "Add specific version for packages" applicable_specs
-                      Pkg.add(applicable_specs)
-
-                      # fix compat of all manually specified packages
-                      fixed_pkg_names = [spec.name for spec in applicable_specs]
-                      # get "info" for all fixed (i.e. contains current version)
-                      fixed_pkg_info = [info for info in values(Pkg.dependencies()) if info.name ∈ fixed_pkg_names]
-                      for info in fixed_pkg_info
-                          Pkg.compat(info.name, string("~", info.version))
-                      end
+                  if !isempty(pr_specs)
+                      @info "Adding specific versions from PR body before resolve" pr_specs
+                      Pkg.add(pr_specs)
                   end
               end
           catch e
-              @info "Skipped adding specific Versions because of error" e
+              @info "Skipped adding specific versions because of error" e
+          end
+      end
+
+      # resolve after adding PR packages
+      Pkg.resolve()
+
+      # fix compat of all manually specified packages (after resolve)
+      if !isempty(pr_specs)
+          try
+              fixed_pkg_names = [spec.name for spec in pr_specs]
+              fixed_pkg_info = [info for info in values(Pkg.dependencies()) if info.name ∈ fixed_pkg_names]
+              for info in fixed_pkg_info
+                  Pkg.compat(info.name, string("~", info.version))
+              end
+          catch e
+              @info "Skipped fixing compat because of error" e
           end
       end
 
